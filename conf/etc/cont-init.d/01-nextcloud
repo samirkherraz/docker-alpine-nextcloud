@@ -10,7 +10,7 @@ then
 	rm /var/www/nextcloud/core/skeleton/* -R
 	rm /tmp/nextcloud-${VERSION}.zip 
 	chown nginx:nginx /var/www/nextcloud -R
-	while [  "x$( nc -vz ${DATABASE_HOST} ${DATABASE_PORT} -w 1 )" == "x" ];
+	while ! $( nc -vz ${DATABASE_HOST} ${DATABASE_PORT} ) ;
 	do
 		sleep 1
 	done
