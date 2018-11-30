@@ -7,8 +7,14 @@ then
 	fi 
 	wget https://download.nextcloud.com/server/releases/nextcloud-${VERSION}.zip -O /tmp/nextcloud-${VERSION}.zip 
 	unzip /tmp/nextcloud-${VERSION}.zip -d /var/www/ 
+	rm /var/www/nextcloud/core/skeleton/* -R
 	rm /tmp/nextcloud-${VERSION}.zip 
 	chown nginx:nginx /var/www/nextcloud -R
+	while [ ! $( nc -vz ${DATABASE_HOST} ${DATABASE_PORT} -w 1 ) ];
+	do
+		sleep 1
+	done
+
 	CMD=$(echo 'cd /var/www/nextcloud/ && php occ maintenance:install  --database "mysql" --database-host "'${DATABASE_HOST}'" --database-port "'${DATABASE_PORT}'" --database-name "'${DATABASE_NAME}'" --database-user "'${DATABASE_USERNAME}'" --database-pass "'${DATABASE_PASSWORD}'" --admin-user "'${ADMIN_USERNAME}'" --admin-pass "'${ADMIN_PASSWORD}'"')
 	eval "su - nginx -s /bin/ash -c '"$CMD"'" 
 
