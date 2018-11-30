@@ -10,7 +10,7 @@ then
 	rm /var/www/nextcloud/core/skeleton/* -R
 	rm /tmp/nextcloud-${VERSION}.zip 
 	chown nginx:nginx /var/www/nextcloud -R
-	while [ ! $( nc -vz ${DATABASE_HOST} ${DATABASE_PORT} -w 1 ) ];
+	while [  "x$( nc -vz ${DATABASE_HOST} ${DATABASE_PORT} -w 1 )" == "x" ];
 	do
 		sleep 1
 	done
@@ -28,10 +28,8 @@ then
         fi
         CMD=$(echo 'cd /var/www/nextcloud/ && php occ config:system:set trusted_domains '$COUNTER' --value='$HOST)
 	    eval "su - nginx -s /bin/ash -c '"$CMD"'" 
-
     done
 
     
-
-
 fi
+
