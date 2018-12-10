@@ -25,13 +25,13 @@ services:
   nextcloud:
     image: samirkherraz/nextcloud
     environment:
-      - DATABASE_HOST=mariadb
-      - DATABASE_PASSWORD=password
-      - DATABASE_USERNAME=root
-      - DATABASE_NAME=nextcloud
-      - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=password
-      - TRUSTED_DOMAIN_0=box.exemple.org
+        - DATABASE_HOST=mariadb
+        - DATABASE_PASSWORD=password
+        - DATABASE_USERNAME=root
+        - DATABASE_NAME=nextcloud
+        - ADMIN_USERNAME=admin
+        - ADMIN_PASSWORD=password
+        - TRUSTED_DOMAIN_0=box.exemple.org
     ports:
       - 8080:80
     volumes:
