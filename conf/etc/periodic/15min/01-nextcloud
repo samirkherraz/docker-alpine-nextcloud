@@ -1,2 +1,2 @@
 #!/bin/sh
-su - nginx -s /bin/ash -c "php -f /var/www/html/cron.php"
+su - nginx -s /bin/ash -c "php -f /var/www/nextcloud/cron.php"
