@@ -1,2 +1,2 @@
 #!/bin/sh
-service-handler "PHP-FPM" "nginx -g 'daemon off;'"
+service-handler "NGINX" "nginx -g 'daemon off;'"

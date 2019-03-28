@@ -1,5 +1,5 @@
 #!/usr/bin/with-contenv sh
-if [ -z "$(ls -A "/var/www/nextcloud")" ]; 
+if [ -z "$(ls -A "/var/www/nextcloud/version.php")" ]; 
 then 
 	if [ ! -d /var/www/nextcloud ]; 
 	then 
@@ -30,6 +30,22 @@ then
 	    eval "su - nginx -s /bin/ash -c '"$CMD"'" 
     done
 
+	MEMCACHED="
+  'memcache.local' => '\\OC\\Memcache\\Memcached', 
+  'memcache.distributed' => '\\OC\\Memcache\\Memcached',
+  'memcached_servers' => 
+  array (
+    0 => 
+    array (
+      0 => '127.0.0.1',
+      1 => 11211,
+    ),
+  ),
+);
+  "
+	
+	sed -i "s|);||g" /var/www/nextcloud/config/config.php
+	echo -e $MEMCACHED >> /var/www/nextcloud/config/config.php
     
 fi
 
