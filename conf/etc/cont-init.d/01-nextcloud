@@ -1,23 +1,63 @@
 #!/usr/bin/with-contenv sh
-if [ -z "$(ls -A "/var/www/nextcloud/version.php")" ]; 
-then 
-	if [ ! -d /var/www/nextcloud ]; 
-	then 
-		mkdir /var/www/nextcloud 
-	fi 
-	wget https://download.nextcloud.com/server/releases/nextcloud-${VERSION}.zip -O /tmp/nextcloud-${VERSION}.zip 
-	unzip /tmp/nextcloud-${VERSION}.zip -d /var/www/ 
-	rm /var/www/nextcloud/core/skeleton/* -R
-	rm /tmp/nextcloud-${VERSION}.zip 
-	chown nginx:nginx /var/www/nextcloud -R
-	while ! $( nc -vz ${DATABASE_HOST} ${DATABASE_PORT} ) ;
-	do
-		sleep 1
-	done
 
-	CMD=$(echo 'cd /var/www/nextcloud/ && php occ maintenance:install  --database "mysql" --database-host "'${DATABASE_HOST}'" --database-port "'${DATABASE_PORT}'" --database-name "'${DATABASE_NAME}'" --database-user "'${DATABASE_USERNAME}'" --database-pass "'${DATABASE_PASSWORD}'" --admin-user "'${ADMIN_USERNAME}'" --admin-pass "'${ADMIN_PASSWORD}'"')
-	eval "su - nginx -s /bin/ash -c '"$CMD"'" 
 
+run_occ(){
+
+  eval "su - nginx -s /bin/ash -c 'cd /var/www/nextcloud/ && "$@"'" 
+
+}
+
+next(){
+    COUNTER=$(($COUNTER + 1))
+}
+
+install(){
+
+    if [ -z "$(ls -A "/var/www/nextcloud/version.php")" ]; 
+    then 
+      if [ ! -d /var/www/nextcloud ]; 
+      then 
+        mkdir /var/www/nextcloud 
+      fi 
+      wget https://download.nextcloud.com/server/releases/nextcloud-${VERSION}.zip -O /tmp/nextcloud-${VERSION}.zip 
+      unzip -q /tmp/nextcloud-${VERSION}.zip -d /var/www/ 
+      rm /var/www/nextcloud/core/skeleton/* -R
+      rm /tmp/nextcloud-${VERSION}.zip 
+
+    fi
+
+    chown nginx:nginx /var/www/nextcloud -R
+
+
+}
+
+
+
+config(){
+
+    INSTALLED=$( run_occ $(echo 'php occ | grep "maintenance:install" ') )
+    if [ -z "$INSTALLED" ]; 
+    then
+        echo "Already Installed"
+    else
+
+        while ! $( nc -vz ${DATABASE_HOST} ${DATABASE_PORT} ) ;
+        do
+            sleep 1
+        done
+
+        run_occ $(echo 'php occ maintenance:install --database "mysql" --database-host "'${DATABASE_HOST}'" --database-port "'${DATABASE_PORT}'" --database-name "'${DATABASE_NAME}'" --database-user "'${DATABASE_USERNAME}'" --database-pass "'${DATABASE_PASSWORD}'" --admin-user "'${ADMIN_USERNAME}'" --admin-pass "'${ADMIN_PASSWORD}'" ')
+        
+        setup_memcached
+
+    fi 
+
+    
+}
+
+setup_trusted_domains(){
+
+    COUNTER=0
     while [ 1 -eq 1 ];
     do    
         NAME="TRUSTED_DOMAIN_"$COUNTER
@@ -26,10 +66,14 @@ then
         then 
             break
         fi
-        CMD=$(echo 'cd /var/www/nextcloud/ && php occ config:system:set trusted_domains '$COUNTER' --value='$HOST)
-	    eval "su - nginx -s /bin/ash -c '"$CMD"'" 
+	      run_occ $(echo 'php occ config:system:set trusted_domains '$COUNTER' --value='$HOST)
+        next 
+
     done
 
+}
+
+setup_memcached(){
 	MEMCACHED="
   'memcache.local' => '\\OC\\Memcache\\Memcached', 
   'memcache.distributed' => '\\OC\\Memcache\\Memcached',
@@ -46,6 +90,10 @@ then
 	
 	sed -i "s|);||g" /var/www/nextcloud/config/config.php
 	echo -e $MEMCACHED >> /var/www/nextcloud/config/config.php
-    
-fi
+}
 
+
+
+install 
+config
+setup_trusted_domains
