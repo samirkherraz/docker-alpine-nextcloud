@@ -1,4 +1,4 @@
-# MariaDB + PHPMyAdmin on Alpine Linux + S6 Overlay
+# Nextcloud on Alpine Linux + S6 Overlay
 
 # Auto configuration parameters :
 

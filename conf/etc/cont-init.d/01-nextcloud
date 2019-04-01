@@ -20,6 +20,7 @@ install(){
       then 
         mkdir /var/www/nextcloud 
       fi 
+      VERSION=$(wget -q -O - https://api.github.com/repos/nextcloud/server/tags | grep "name" | cut -d '"' -f4 | egrep "v([0-9].?)*$" | sed -e 's/v//g' | sort -r | head -n 1 )
       wget https://download.nextcloud.com/server/releases/nextcloud-${VERSION}.zip -O /tmp/nextcloud-${VERSION}.zip ||  return 1 
       unzip -q /tmp/nextcloud-${VERSION}.zip -d /var/www/ ||  return 1
       rm /var/www/nextcloud/core/skeleton/* -R 
@@ -50,10 +51,10 @@ config(){
         run_occ $(echo 'php occ maintenance:install --database "mysql" --database-host "'${DATABASE_HOST}'" --database-port "'${DATABASE_PORT}'" --database-name "'${DATABASE_NAME}'" --database-user "'${DATABASE_USERNAME}'" --database-pass "'${DATABASE_PASSWORD}'" --admin-user "'${ADMIN_USERNAME}'" --admin-pass "'${ADMIN_PASSWORD}'" ')  ||  return 1
         
         setup_memcached
-        return 0
 
     fi 
 
+    return 0
     
 }
 
@@ -98,13 +99,13 @@ setup_memcached(){
 
 fail(){
 
-  echo "1" > /tmp/01-nextcloud
+  echo "1" > /tmp/nextcloud
 
 }
 
 success(){
 
-  echo "0" > /tmp/01-nextcloud
+  echo "0" > /tmp/nextcloud
 
 }
 

@@ -1,7 +1,6 @@
 FROM samirkherraz/alpine-s6
 
-ENV VERSION=15.0.5 \
-    DATABASE_HOST=localhost \
+ENV DATABASE_HOST=localhost \
     DATABASE_PORT=3306 \
     DATABASE_PASSWORD=password \
     DATABASE_USERNAME=username \
@@ -11,12 +10,12 @@ ENV VERSION=15.0.5 \
     TRUSTED_DOMAIN_0=localhost 
 
 RUN set -x \
-    && apk  add curl php7 php7-fpm php7-gd php7-intl php7-ldap php7-memcached php7-pcntl php7-pdo php7-zip php7-mbstring php7-dom php7-xmlwriter php7-xmlreader php7-xml php7-ctype php7-json php7-iconv php7-simplexml php7-curl php7-pdo_mysql php7-posix php7-cli php7-mcrypt php7-opcache php7-fileinfo php7-imagick memcached
+    && apk --no-cache add curl php7 php7-fpm php7-gd php7-intl php7-ldap php7-memcached php7-pcntl php7-pdo php7-zip php7-mbstring php7-dom php7-xmlwriter php7-xmlreader php7-xml php7-ctype php7-json php7-iconv php7-simplexml php7-curl php7-pdo_mysql php7-posix php7-cli php7-mcrypt php7-opcache php7-fileinfo php7-imagick memcached
 
 RUN set -x \
-    && apk --no-cache --virtual add nginx \
+    && apk --no-cache add nginx \
     && mkdir -p /run/nginx/ \
-    && rm -R /var/www/* \
+    && rm -R /var/www/* || true \
     && chown nginx:nginx /var/www/ /run/nginx/
 
 
