@@ -1,2 +1,7 @@
 #!/bin/sh
-service-handler "NGINX" "nginx -g 'daemon off;'"
+NAME="NGINX" 
+COMMAND="nginx -g 'daemon off;'" 
+WAIT="/tmp/01-nextcloud"
+
+
+exec service-handler "$NAME" "$COMMAND" "$WAIT"

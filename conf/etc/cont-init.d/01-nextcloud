@@ -2,13 +2,14 @@
 
 
 run_occ(){
-
+  
   eval "su - nginx -s /bin/ash -c 'cd /var/www/nextcloud/ && "$@"'" 
-
+  return $? 
 }
 
 next(){
     COUNTER=$(($COUNTER + 1))
+    return 0
 }
 
 install(){
@@ -19,15 +20,15 @@ install(){
       then 
         mkdir /var/www/nextcloud 
       fi 
-      wget https://download.nextcloud.com/server/releases/nextcloud-${VERSION}.zip -O /tmp/nextcloud-${VERSION}.zip 
-      unzip -q /tmp/nextcloud-${VERSION}.zip -d /var/www/ 
-      rm /var/www/nextcloud/core/skeleton/* -R
+      wget https://download.nextcloud.com/server/releases/nextcloud-${VERSION}.zip -O /tmp/nextcloud-${VERSION}.zip ||  return 1 
+      unzip -q /tmp/nextcloud-${VERSION}.zip -d /var/www/ ||  return 1
+      rm /var/www/nextcloud/core/skeleton/* -R 
       rm /tmp/nextcloud-${VERSION}.zip 
 
     fi
 
     chown nginx:nginx /var/www/nextcloud -R
-
+    return 0
 
 }
 
@@ -46,9 +47,10 @@ config(){
             sleep 1
         done
 
-        run_occ $(echo 'php occ maintenance:install --database "mysql" --database-host "'${DATABASE_HOST}'" --database-port "'${DATABASE_PORT}'" --database-name "'${DATABASE_NAME}'" --database-user "'${DATABASE_USERNAME}'" --database-pass "'${DATABASE_PASSWORD}'" --admin-user "'${ADMIN_USERNAME}'" --admin-pass "'${ADMIN_PASSWORD}'" ')
+        run_occ $(echo 'php occ maintenance:install --database "mysql" --database-host "'${DATABASE_HOST}'" --database-port "'${DATABASE_PORT}'" --database-name "'${DATABASE_NAME}'" --database-user "'${DATABASE_USERNAME}'" --database-pass "'${DATABASE_PASSWORD}'" --admin-user "'${ADMIN_USERNAME}'" --admin-pass "'${ADMIN_PASSWORD}'" ')  ||  return 1
         
         setup_memcached
+        return 0
 
     fi 
 
@@ -66,10 +68,12 @@ setup_trusted_domains(){
         then 
             break
         fi
-	      run_occ $(echo 'php occ config:system:set trusted_domains '$COUNTER' --value='$HOST)
+	      run_occ $(echo 'php occ config:system:set trusted_domains '$COUNTER' --value='$HOST) ||  return 1
         next 
 
     done
+
+    return 0
 
 }
 
@@ -92,8 +96,19 @@ setup_memcached(){
 	echo -e $MEMCACHED >> /var/www/nextcloud/config/config.php
 }
 
+fail(){
+
+  echo "1" > /tmp/01-nextcloud
+
+}
+
+success(){
+
+  echo "0" > /tmp/01-nextcloud
+
+}
 
 
-install 
-config
-setup_trusted_domains
+
+
+install  &&  config && setup_trusted_domains && success || fail

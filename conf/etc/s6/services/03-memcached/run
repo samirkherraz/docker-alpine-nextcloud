@@ -1,2 +1,6 @@
 #!/bin/sh
-service-handler "MEMCACHED" "memcached -u memcached --listen=127.0.0.1"
+NAME="MEMCACHED" 
+COMMAND="memcached -u memcached --listen=127.0.0.1" 
+WAIT="/tmp/01-nextcloud"
+
+exec service-handler "$NAME" "$COMMAND" "$WAIT"
