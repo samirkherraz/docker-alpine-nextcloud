@@ -101,7 +101,6 @@ setup_memcached(){
 	
 	sed -i "s|);||g" /var/www/nextcloud/config/config.php
 	echo -e $MEMCACHED >> /var/www/nextcloud/config/config.php
-
   return 0
 }
 
