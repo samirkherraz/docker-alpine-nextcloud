@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv sh
 
-
+COUNTER=0
 run_occ(){
   
   eval "su - nginx -s /bin/ash -c 'cd /var/www/nextcloud/ && "$@"'" 
@@ -13,22 +13,26 @@ next(){
 }
 
 install(){
-
+    echo "> Install "
     if [ -z "$(ls -A "/var/www/nextcloud/version.php")" ]; 
     then 
+      echo ">>> Not installed "
       if [ ! -d /var/www/nextcloud ]; 
       then 
         mkdir /var/www/nextcloud 
       fi 
       VERSION=$(wget -q -O - https://api.github.com/repos/nextcloud/server/tags | grep "name" | cut -d '"' -f4 | egrep "v([0-9].?)*$" | sed -e 's/v//g' | sort -r | head -n 1 )
+      echo ">>> Download $VERSION"
       wget https://download.nextcloud.com/server/releases/nextcloud-${VERSION}.zip -O /tmp/nextcloud-${VERSION}.zip ||  return 1 
+      echo ">>> Unzip "
       unzip -q /tmp/nextcloud-${VERSION}.zip -d /var/www/ ||  return 1
       rm /var/www/nextcloud/core/skeleton/* -R 
       rm /tmp/nextcloud-${VERSION}.zip 
 
     fi
-
+    echo ">>> Fix Permissions"
     chown nginx:nginx /var/www/nextcloud -R
+    echo ">>> Installed "
     return 0
 
 }
@@ -36,18 +40,19 @@ install(){
 
 
 config(){
-
+    echo "> Config "
     INSTALLED=$( run_occ $(echo 'php occ | grep "maintenance:install" ') )
     if [ -z "$INSTALLED" ]; 
     then
-        echo "Already Installed"
+        echo ">>> Already configured"
     else
-
+        echo ">>> Waiting for database to be ready"
         while ! $( nc -vz ${DATABASE_HOST} ${DATABASE_PORT} ) ;
         do
             sleep 1
         done
-
+        echo ">>> Database ready"
+        echo ">>> Configuring"
         run_occ $(echo 'php occ maintenance:install --database "mysql" --database-host "'${DATABASE_HOST}'" --database-port "'${DATABASE_PORT}'" --database-name "'${DATABASE_NAME}'" --database-user "'${DATABASE_USERNAME}'" --database-pass "'${DATABASE_PASSWORD}'" --admin-user "'${ADMIN_USERNAME}'" --admin-pass "'${ADMIN_PASSWORD}'" ')  ||  return 1
         
         setup_memcached
@@ -59,8 +64,7 @@ config(){
 }
 
 setup_trusted_domains(){
-
-    COUNTER=0
+    echo "> Setup Trusted domains"
     while [ 1 -eq 1 ];
     do    
         NAME="TRUSTED_DOMAIN_"$COUNTER
@@ -69,6 +73,7 @@ setup_trusted_domains(){
         then 
             break
         fi
+        echo ">>> Setup $COUNTER => $HOST"
 	      run_occ $(echo 'php occ config:system:set trusted_domains '$COUNTER' --value='$HOST) ||  return 1
         next 
 
@@ -79,6 +84,7 @@ setup_trusted_domains(){
 }
 
 setup_memcached(){
+  echo ">>> Setup Memecached"
 	MEMCACHED="
   'memcache.local' => '\\OC\\Memcache\\Memcached', 
   'memcache.distributed' => '\\OC\\Memcache\\Memcached',
@@ -95,21 +101,25 @@ setup_memcached(){
 	
 	sed -i "s|);||g" /var/www/nextcloud/config/config.php
 	echo -e $MEMCACHED >> /var/www/nextcloud/config/config.php
+
+  return 0
 }
 
 fail(){
-
+  echo "[ Failed ]"
   echo "1" > /tmp/nextcloud
+  return 1
 
 }
 
 success(){
-
+  echo "[ Success ]"
   echo "0" > /tmp/nextcloud
+  return 0
 
 }
 
 
 
 
-install  &&  config && setup_trusted_domains && success || fail
+install && config && setup_trusted_domains && success || fail
