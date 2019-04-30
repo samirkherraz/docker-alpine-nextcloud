@@ -1,2 +1,11 @@
 #!/bin/sh
-su - nginx -s /bin/ash -c "php -f /var/www/nextcloud/cron.php"
+
+run(){
+    eval "su - nginx -s /bin/ash -c 'cd /var/www/nextcloud/ && "$@"'" 
+    return $? 
+}
+
+if [ -f /tmp/nextcloud_configured ] && [ $(cat /tmp/nextcloud_configured) -eq 0 ]
+then
+    run php cron.php
+fi

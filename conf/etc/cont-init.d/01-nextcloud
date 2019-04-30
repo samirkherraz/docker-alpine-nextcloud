@@ -1,124 +1,197 @@
 #!/usr/bin/with-contenv sh
 
 COUNTER=0
-run_occ(){
-  
-  eval "su - nginx -s /bin/ash -c 'cd /var/www/nextcloud/ && "$@"'" 
-  return $? 
-}
 
 next(){
     COUNTER=$(($COUNTER + 1))
     return 0
 }
 
-install(){
-    echo "> Install "
-    if [ -z "$(ls -A "/var/www/nextcloud/version.php")" ]; 
-    then 
-      echo ">>> Not installed "
-      if [ ! -d /var/www/nextcloud ]; 
-      then 
-        mkdir /var/www/nextcloud 
-      fi 
-      VERSION=$(wget -q -O - https://api.github.com/repos/nextcloud/server/tags | grep "name" | cut -d '"' -f4 | egrep "v([0-9].?)*$" | sed -e 's/v//g' | sort -r | head -n 1 )
-      echo ">>> Download $VERSION"
-      wget https://download.nextcloud.com/server/releases/nextcloud-${VERSION}.zip -O /tmp/nextcloud-${VERSION}.zip ||  return 1 
-      echo ">>> Unzip "
-      unzip -q /tmp/nextcloud-${VERSION}.zip -d /var/www/ ||  return 1
-      rm /var/www/nextcloud/core/skeleton/* -R 
-      rm /tmp/nextcloud-${VERSION}.zip 
-
-    fi
-    echo ">>> Fix Permissions"
-    chown nginx:nginx /var/www/nextcloud -R
-    echo ">>> Installed "
-    return 0
-
+run(){
+  eval "su - nginx -s /bin/ash -c 'cd /var/www/nextcloud/ && "$@"'" 
+  return $? 
 }
 
+wait_db(){
+    echo ">>> Waiting for database to be ready"
+    while ! $(nc -vz ${DATABASE_HOST} ${DATABASE_PORT})
+    do
+        sleep 1
+    done
+    echo ">>> Database ready"
+}
 
+do_query(){
+    echo $1 > /tmp/cmd
+    /usr/bin/mysql -h ${DATABASE_HOST} -P ${DATABASE_PORT} -u ${DATABASE_USERNAME} ${DATABASE_NAME} --password=${DATABASE_PASSWORD} </tmp/cmd 
+    RET=$?
+    rm /tmp/cmd
+    return $RET
+}
+
+check_configured(){
+    OUT=$(do_query "SELECT 1 FROM __configured;" 2>&1)
+    RET=$?
+
+    [ $RET -eq 1 ] && echo "$OUT" | grep 1146 >/dev/null
+    [ $? -eq 1 ]
+    CONFIGURED=$?
+
+    [ $RET -eq 1 -a $CONFIGURED -eq 0 ]
+    DB_PROBLEM=$?
+}
+
+add_configured(){
+    do_query "CREATE TABLE __configured(a INT NOT NULL AUTO_INCREMENT PRIMARY KEY);"
+}
+
+switch_nginx_conf(){
+    mv /etc/nginx/conf.d/nextcloud* /opt/ressources/nginx/conf.d/ 2>/dev/null
+
+    filename=""
+    [ $1 ] && filename="-$1"
+
+    mv "/opt/ressources/nginx/conf.d/nextcloud$filename.conf" /etc/nginx/conf.d/
+}
+
+install(){
+    echo "> Install"
+    if [ ! -d /var/www/nextcloud ] 
+    then
+        echo ">>> No volume mounted"
+        echo ">>>>> Creating working dir"
+        mkdir -p /var/www/nextcloud
+    fi
+
+    if [ ! -d /var/www/error ]
+    then
+        echo ">>> Creating static web error pages"
+        mkdir -p /var/www/error
+        mv /opt/ressources/www/error/*.html /var/www/error/ 2>/dev/null
+
+        chown nginx:nginx /var/www/error -R
+    fi
+
+    ls /var/www/nextcloud/index.php >/dev/null 2>&1
+    INSTALLED=$?
+
+    wait_db
+    check_configured
+
+    echo "INSTALLED = $INSTALLED and CONFIGURED = $CONFIGURED"
+
+    if [ $DB_PROBLEM -eq 0 ]
+    then
+        echo ">>> Problem detected, can't connect to database"
+        echo "Query answer: $OUT"
+        switch_nginx_conf db_error
+        success
+    fi
+
+    if [ ! $INSTALLED -eq 0 ]
+    then
+        if [ ! $CONFIGURED -eq 0 ]
+        then
+            VERSION=$(wget -q -O - https://api.github.com/repos/nextcloud/server/tags \
+            | grep "name" | cut -d '"' -f4 | egrep "v([0-9].?)*$" | sed -e 's/v//g' \
+            | sort -r | head -n 1 )
+
+            echo ">>> Downloading $VERSION"
+            wget https://download.nextcloud.com/server/releases/nextcloud-${VERSION}.zip \
+            -O /tmp/nextcloud-${VERSION}.zip ||  return 1 
+
+            echo ">>> Unzipping "
+            unzip -q /tmp/nextcloud-${VERSION}.zip -d /var/www/ ||  return 1
+
+            rm /var/www/nextcloud/core/skeleton/* -R 
+            rm /tmp/nextcloud-${VERSION}.zip 
+
+            echo ">>> Fixing permissions"
+            chown nginx:nginx /var/www/nextcloud -R
+        else
+            echo ">>> Problem detected, hanging database with no installation"
+            switch_nginx_conf hanging_database
+            success
+        fi
+    else
+        echo ">>> Already Installed"
+    fi
+
+    return 0
+}
 
 config(){
-    echo "> Config "
-    INSTALLED=$( run_occ $(echo 'php occ | grep "maintenance:install" ') )
-    if [ -z "$INSTALLED" ]; 
-    then
-        echo ">>> Already configured"
-    else
-        echo ">>> Waiting for database to be ready"
-        while ! $( nc -vz ${DATABASE_HOST} ${DATABASE_PORT} ) ;
-        do
-            sleep 1
-        done
-        echo ">>> Database ready"
+    echo "> Config"
+
+    if [ ! $CONFIGURED -eq 0 ]
+    then 
         echo ">>> Configuring"
-        run_occ $(echo 'php occ maintenance:install --database "mysql" --database-host "'${DATABASE_HOST}'" --database-port "'${DATABASE_PORT}'" --database-name "'${DATABASE_NAME}'" --database-user "'${DATABASE_USERNAME}'" --database-pass "'${DATABASE_PASSWORD}'" --admin-user "'${ADMIN_USERNAME}'" --admin-pass "'${ADMIN_PASSWORD}'" ')  ||  return 1
+        run $(echo 'php occ maintenance:install --database "mysql" --database-host "'${DATABASE_HOST}'" --database-port "'${DATABASE_PORT}'" --database-name "'${DATABASE_NAME}'" --database-user "'${DATABASE_USERNAME}'" --database-pass "'${DATABASE_PASSWORD}'" --admin-user "'${ADMIN_USERNAME}'" --admin-pass "'${ADMIN_PASSWORD}'" ')  ||  return 1
         
         setup_memcached
 
-    fi 
+        add_configured
+    else
+        echo ">>> Already Configured"
+    fi
+    
+    echo ">>> Switching to vtigercrm nginx conf"
+    switch_nginx_conf
+
+    echo 0 > /tmp/nextcloud_configured
 
     return 0
-    
 }
 
 setup_trusted_domains(){
-    echo "> Setup Trusted domains"
-    while [ 1 -eq 1 ];
+    echo "> Setting up Trusted domains"
+    while true
     do    
         NAME="TRUSTED_DOMAIN_"$COUNTER
         HOST=$(eval 'echo $'$NAME)
-        if [ -z "$HOST" ];
+        if [ -z "$HOST" ]
         then 
             break
         fi
         echo ">>> Setup $COUNTER => $HOST"
-	      run_occ $(echo 'php occ config:system:set trusted_domains '$COUNTER' --value='$HOST) ||  return 1
+	      run $(echo 'php occ config:system:set trusted_domains '$COUNTER' --value='$HOST) ||  return 1
         next 
-
     done
 
     return 0
-
 }
 
 setup_memcached(){
-  echo ">>> Setup Memecached"
-	MEMCACHED="
-  'memcache.local' => '\\OC\\Memcache\\Memcached', 
-  'memcache.distributed' => '\\OC\\Memcache\\Memcached',
-  'memcached_servers' => 
-  array (
-    0 => 
-    array (
-      0 => '127.0.0.1',
-      1 => 11211,
-    ),
-  ),
-);
-  "
-	
-	sed -i "s|);||g" /var/www/nextcloud/config/config.php
-	echo -e $MEMCACHED >> /var/www/nextcloud/config/config.php
-  return 0
+    echo ">>> Setting up Memcached"
+    MEMCACHED="
+        'memcache.local' => '\\OC\\Memcache\\Memcached', 
+        'memcache.distributed' => '\\OC\\Memcache\\Memcached',
+        'memcached_servers' => 
+        array (
+          0 => 
+          array (
+            0 => '127.0.0.1',
+            1 => 11211,
+          ),
+        ),
+        );
+    "
+    
+    sed -i "s|);||g" /var/www/nextcloud/config/config.php
+    echo -e $MEMCACHED >> /var/www/nextcloud/config/config.php
+    return 0
 }
 
 fail(){
-  echo "[ Failed ]"
-  echo "1" > /tmp/nextcloud
-  return 1
-
+    echo "[ Failed ]"
+    echo "1" > /tmp/nextcloud
+    exit 1
 }
 
 success(){
-  echo "[ Success ]"
-  echo "0" > /tmp/nextcloud
-  return 0
-
+    echo "[ Success ]"
+    echo "0" > /tmp/nextcloud
+    exit 0
 }
-
-
-
 
 install && config && setup_trusted_domains && success || fail

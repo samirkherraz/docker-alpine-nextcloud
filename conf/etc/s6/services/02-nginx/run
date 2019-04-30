@@ -3,5 +3,4 @@ NAME="NGINX"
 COMMAND="nginx -g 'daemon off;'" 
 WAIT="/tmp/nextcloud"
 
-
 exec service-handler "$NAME" "$COMMAND" "$WAIT"
