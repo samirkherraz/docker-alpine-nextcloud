@@ -10,11 +10,11 @@
 - ADMIN_USERNAME=admin ( Nextcloud admin username )
 - ADMIN_PASSWORD=password ( Nextcloud admin password  )
 - TRUSTED_DOMAIN_0=localhost  ( Nextcloud trusted domain )
-- TRUSTED_DOMAIN_1=box.exemple.org  ( You can add many trusted domains by adding TRUSTED_DOMAIN_X = domain )
+- TRUSTED_DOMAIN_1=box.example.org  ( You can add many trusted domains by adding TRUSTED_DOMAIN_X = domain )
 
 
 
-# Compose file exemple
+# Compose file example
 
 ```
 
@@ -26,12 +26,14 @@ services:
     image: samirkherraz/nextcloud
     environment:
         - DATABASE_HOST=mariadb
-        - DATABASE_PASSWORD=password
-        - DATABASE_USERNAME=root
+        - DATABASE_PORT=3306
         - DATABASE_NAME=nextcloud
+        - DATABASE_USERNAME=nextcloud
+        - DATABASE_PASSWORD=password
         - ADMIN_USERNAME=admin
         - ADMIN_PASSWORD=password
-        - TRUSTED_DOMAIN_0=box.exemple.org
+        - TRUSTED_DOMAIN_0=172.17.0.1:8080
+        - TRUSTED_DOMAIN_1=box.example.org
     ports:
       - 8080:80
     volumes:
@@ -46,11 +48,12 @@ services:
         condition: on-failure
       mode: global
 
-
   mariadb:
     image: samirkherraz/mariadb
     environment:
       - ROOT_PASSWORD=password
+      - DB_0_NAME=nextcloud
+      - DB_0_PASS=password
     ports:
       - 3306:3306
       - 8081:80
@@ -66,8 +69,6 @@ services:
       restart_policy:
         condition: on-failure
       mode: global
-
-
 
 volumes:
     nextcloud-data:
