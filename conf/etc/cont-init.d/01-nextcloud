@@ -54,17 +54,6 @@ switch_nginx_conf(){
     mv "/opt/ressources/nginx/conf.d/nextcloud$filename.conf" /etc/nginx/conf.d/
 }
 
-backup_install(){
-    echo ">>> Creating backup of installation"
-    if [ ! -d /var/www/.backup ]
-    then
-        mkdir -p /var/www/.backup
-        cp -r /var/www/nextcloud /var/www/.backup/
-
-        chown nginx:nginx /var/www/.backup -R
-    fi
-}
-
 install(){
     echo "> Install"
     if [ ! -d /var/www/nextcloud ] 
@@ -99,19 +88,6 @@ install(){
         success
     fi
 
-    if [ $INSTALLED -eq 0 -a ! $CONFIGURED -eq 0 ]
-    then
-        echo ">>> Already installed but the database was dropped"
-        backup_install
-
-        # if the database is dropped, nextcloud doesn't let us use the already installed files
-        # so we reinstall
-        echo ">>> Reinstalling"
-        rm -r /var/www/nextcloud/*
-        rm -r /var/www/nextcloud/.* 2>/dev/null
-        INSTALLED=1
-    fi
-
     if [ ! $INSTALLED -eq 0 ]
     then
         if [ ! $CONFIGURED -eq 0 ]
@@ -134,11 +110,18 @@ install(){
             chown nginx:nginx /var/www/nextcloud -R
         else
             echo ">>> Problem detected, hanging database with no installation"
-            switch_nginx_conf hanging_database
+            switch_nginx_conf hanging_db
             success
         fi
     else
-        echo ">>> Already Installed"
+        if [ ! $CONFIGURED -eq 0 ]
+        then
+            echo ">>> Problem detected, already installed but the database was dropped"
+            switch_nginx_conf db_dropped
+            success
+        else
+            echo ">>> Already installed"
+        fi
     fi
 
     return 0
