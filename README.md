@@ -5,6 +5,8 @@ this repository is archived.
 
 For any contribution or issue, refer to the new repository !!!
 
+https://github.com/newgeneration-sr/docker-alpine-nextcloud
+
 ---
 
 # Nextcloud on Alpine Linux + S6 Overlay
